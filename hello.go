@@ -57,9 +57,9 @@ func connectToServer(srvAddr string) net.TCPConn {
 }
 
 func parseHelloServer(answer []byte) ServerHello {
-	serverHello := ServerHello{}
-	offset := 0
 	println("Parsing Server Hello")
+	offset := 0
+	serverHello := ServerHello{}
 	//println("Parsing Server Hello > Record Header")
 	recordHeader := RecordHeader{}
 	recordHeader.ttype = answer[0]
@@ -127,8 +127,14 @@ type ServerHello struct {
 	extensionRenegotiationInfo ExtensionRenegotiationInfo
 }
 
+//func (recordHeader RecordHeader) String() string {}
+//func (HandshakeHeader HandshakeHeader) String() string {}
+//func (extensionRenegotiationInfo ExtensionRenegotiationInfo) String() string {}
+
 func (serverHello ServerHello) String() string {
 	out := fmt.Sprintf("Server Hello\n")
+	//out += fmt.Sprintf(serverHello.recordHeader)
+	//out += fmt.Sprintf(serverHello.handshakeHeader)
 	out += fmt.Sprintf("  Record Header\n")
 	out += fmt.Sprintf("    ttype...........: %x\n", serverHello.recordHeader.ttype)
 	out += fmt.Sprintf("    protocol Version: %x\n", serverHello.recordHeader.protocol_verion)
@@ -144,12 +150,12 @@ func (serverHello ServerHello) String() string {
 	out += fmt.Sprintf("  CipherSuite.......: %x\n", serverHello.cipherSuite)
 	out += fmt.Sprintf("  CompressionMethod.: %x\n", serverHello.compressionMethod)
 	out += fmt.Sprintf("  ExtensionLength...: %x\n", serverHello.extensionLength)
-	//out += fmt.Sprintf("  ExtensionRenegInfo:%x\n", serverHello.extensionRenegotiationInfo)
 	out += fmt.Sprintf("  Extension Renegotiation Info\n")
 	out += fmt.Sprintf("    info:...........: %x\n", serverHello.extensionRenegotiationInfo.info)
 	out += fmt.Sprintf("    length:.........: %x\n", serverHello.extensionRenegotiationInfo.length)
 	out += fmt.Sprintf("    payload:........: %x\n", serverHello.extensionRenegotiationInfo.payload)
 
+	//out += fmt.Sprintf(serverHello.extensionRenegotiationInfo)
 	return out
 }
 
