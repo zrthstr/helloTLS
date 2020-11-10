@@ -12,7 +12,8 @@ import (
 
 func sendToServer(conn net.TCPConn, msgHex string) {
 
-	var msg []byte
+	//var msg []byte
+	fmt.Println("Sending 'Client Hello' to server:", msgHex)
 	payload, err := hex.DecodeString(msgHex)
 	if err != nil {
 		println("DecodeString failed:", err.Error())
@@ -24,22 +25,23 @@ func sendToServer(conn net.TCPConn, msgHex string) {
 		println("Write to server failed:", err.Error())
 		os.Exit(1)
 	}
-	println("write to server = ", msg)
+	//println("write to server = ", msg)
 }
 
 func readFromServer(conn net.TCPConn) []byte {
-	reply := make([]byte, 1600)
+	reply := make([]byte, 600)
 	_, err := conn.Read(reply)
 	if err != nil {
 		println("Read from server failed:", err.Error())
 		os.Exit(1)
 	}
-	println("reply form server=", string(reply))
-	fmt.Printf("%x\n", reply)
+	//println("reply form server=", string(reply))
+	fmt.Printf("Message received from server: %x\n", reply)
 	return reply
 }
 
 func connectToServer(srvAddr string) net.TCPConn {
+	fmt.Println("Connecting to server:", srvAddr)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", srvAddr)
 	if err != nil {
 		println("ResolveTCPAddr failed")
@@ -55,25 +57,42 @@ func connectToServer(srvAddr string) net.TCPConn {
 }
 
 func parseHelloServer(answer []byte) ServerHello {
-	offset := 5
+	serverHello := ServerHello{}
+	offset := 0
 	println("Parsing Server Hello")
-	println("Parsing Server Hello > Record Header")
+	//println("Parsing Server Hello > Record Header")
 	recordHeader := RecordHeader{}
 	recordHeader.ttype = answer[0]
 	copy(recordHeader.protocol_verion[:], answer[1:3])
 	copy(recordHeader.footer[:], answer[3:5])
 	//println(recordHeader.footer[0], recordHeader.footer[1])
 	recordHeader.footerInt = binary.BigEndian.Uint16(answer[3:5])
+	serverHello.recordHeader = recordHeader
 
 	offset += 5
 	handshakeHeader := HandshakeHeader{}
 	handshakeHeader.message_type = answer[offset+0]
 	copy(handshakeHeader.footer[:], answer[offset+1:offset+4])
 	handshakeHeader.footerInt = binary.BigEndian.Uint32(append([]byte{0}, answer[offset+1:offset+4]...))
+	serverHello.handshakeHeader = handshakeHeader
 
 	offset += 4
+	copy(serverHello.serverVersion[:], answer[offset:offset+2])
+	copy(serverHello.serverRandom[:], answer[offset+2:offset+34])
+	copy(serverHello.sessionID[:], answer[offset+34:offset+35])
+	copy(serverHello.cipherSuite[:], answer[offset+35:offset+37])
+	copy(serverHello.compressionMethod[:], answer[offset+37:offset+38])
+	copy(serverHello.extensionLength[:], answer[offset+38:offset+40])
 
-	serverHello := ServerHello{recordHeader, handshakeHeader}
+	extensionRenegotiationInfo := ExtensionRenegotiationInfo{}
+	offset += 40
+	copy(extensionRenegotiationInfo.info[:], answer[offset:offset+2])
+	copy(extensionRenegotiationInfo.length[:], answer[offset+2:offset+4])
+	copy(extensionRenegotiationInfo.payload[:], answer[offset+4:offset+5])
+	serverHello.extensionRenegotiationInfo = extensionRenegotiationInfo
+
+	//copy(serverHello.extensionRenegotiationInfo[:], answer[offset+40:offset+45])
+
 	return serverHello
 }
 
@@ -90,9 +109,48 @@ type HandshakeHeader struct {
 	footerInt    uint32
 }
 
+type ExtensionRenegotiationInfo struct {
+	info    [2]byte
+	length  [2]byte
+	payload [1]byte
+}
+
 type ServerHello struct {
-	recordHeader    RecordHeader
-	handshakeHeader HandshakeHeader
+	recordHeader               RecordHeader
+	handshakeHeader            HandshakeHeader
+	serverVersion              [2]byte
+	serverRandom               [32]byte
+	sessionID                  [1]byte
+	cipherSuite                [2]byte
+	compressionMethod          [1]byte
+	extensionLength            [2]byte
+	extensionRenegotiationInfo ExtensionRenegotiationInfo
+}
+
+func (serverHello ServerHello) String() string {
+	out := fmt.Sprintf("Server Hello\n")
+	out += fmt.Sprintf("  Record Header\n")
+	out += fmt.Sprintf("    ttype...........: %x\n", serverHello.recordHeader.ttype)
+	out += fmt.Sprintf("    protocol Version: %x\n", serverHello.recordHeader.protocol_verion)
+	out += fmt.Sprintf("    footer..........: %x\n", serverHello.recordHeader.footer)
+	out += fmt.Sprintf("    footerInt.......: %x\n", serverHello.recordHeader.footerInt)
+	out += fmt.Sprintf("  Handshake Header\n")
+	out += fmt.Sprintf("    message type....: %02x\n", serverHello.handshakeHeader.message_type)
+	out += fmt.Sprintf("    footer..........: %x\n", serverHello.handshakeHeader.footer)
+	out += fmt.Sprintf("    footerInt.......: %x\n", serverHello.handshakeHeader.footerInt)
+	out += fmt.Sprintf("  Server Version....: %x\n", serverHello.serverVersion)
+	out += fmt.Sprintf("  Server Random.....: %x\n", serverHello.serverRandom)
+	out += fmt.Sprintf("  Session ID........: %x\n", serverHello.sessionID)
+	out += fmt.Sprintf("  CipherSuite.......: %x\n", serverHello.cipherSuite)
+	out += fmt.Sprintf("  CompressionMethod.: %x\n", serverHello.compressionMethod)
+	out += fmt.Sprintf("  ExtensionLength...: %x\n", serverHello.extensionLength)
+	//out += fmt.Sprintf("  ExtensionRenegInfo:%x\n", serverHello.extensionRenegotiationInfo)
+	out += fmt.Sprintf("  Extension Renegotiation Info\n")
+	out += fmt.Sprintf("    info:...........: %x\n", serverHello.extensionRenegotiationInfo.info)
+	out += fmt.Sprintf("    length:.........: %x\n", serverHello.extensionRenegotiationInfo.length)
+	out += fmt.Sprintf("    payload:........: %x\n", serverHello.extensionRenegotiationInfo.payload)
+
+	return out
 }
 
 func main() {
