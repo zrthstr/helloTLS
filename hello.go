@@ -56,8 +56,9 @@ func connectToServer(srvAddr string) net.TCPConn {
 	return *conn
 }
 
-func parseHelloServer(answer []byte) ServerHello {
+func parseHelloServer(answer []byte) (ServerHello, []byte) {
 	println("Parsing Server Hello")
+	//var offset uint64
 	offset := 0
 	serverHello := ServerHello{}
 	//println("Parsing Server Hello > Record Header")
@@ -79,10 +80,21 @@ func parseHelloServer(answer []byte) ServerHello {
 	offset += 4
 	copy(serverHello.serverVersion[:], answer[offset:offset+2])
 	copy(serverHello.serverRandom[:], answer[offset+2:offset+34])
-	copy(serverHello.sessionID[:], answer[offset+34:offset+35])
+	copy(serverHello.sessionIDLenght[:], answer[offset+34:offset+35])
+
+	// if sessionIDLenght > 0 ...
+	//serverHello.sessionIDLenghtInt = binary.BigEndian.Uint16(serverHello.sessionIDLenght[:])
+	serverHello.sessionIDLenghtInt = int(serverHello.sessionIDLenght[0])
+	if serverHello.sessionIDLenghtInt > 0 {
+		serverHello.sessionID = answer[offset+35 : offset+serverHello.sessionIDLenghtInt+35]
+		offset += serverHello.sessionIDLenghtInt
+		println("copy sessionIDLenght copied len:", serverHello.sessionIDLenghtInt)
+	}
+
 	copy(serverHello.cipherSuite[:], answer[offset+35:offset+37])
 	copy(serverHello.compressionMethod[:], answer[offset+37:offset+38])
 	copy(serverHello.extensionLength[:], answer[offset+38:offset+40])
+	recordHeader.footerInt = binary.BigEndian.Uint16(answer[3:5])
 
 	extensionRenegotiationInfo := ExtensionRenegotiationInfo{}
 	offset += 40
@@ -93,7 +105,7 @@ func parseHelloServer(answer []byte) ServerHello {
 
 	//copy(serverHello.extensionRenegotiationInfo[:], answer[offset+40:offset+45])
 
-	return serverHello
+	return serverHello, answer[offset:]
 }
 
 type RecordHeader struct {
@@ -120,8 +132,10 @@ type ServerHello struct {
 	handshakeHeader            HandshakeHeader
 	serverVersion              [2]byte
 	serverRandom               [32]byte
-	sessionID                  [1]byte
-	cipherSuite                [2]byte
+	sessionIDLenght            [1]byte
+	sessionIDLenghtInt         int
+	sessionID                  []byte
+	cipherSuite                [2]byte // https://cheatsheetseries.owasp.org/cheatsheets/TLS_Cipher_String_Cheat_Sheet.html
 	compressionMethod          [1]byte
 	extensionLength            [2]byte
 	extensionRenegotiationInfo ExtensionRenegotiationInfo
@@ -143,9 +157,11 @@ func (serverHello ServerHello) String() string {
 	out += fmt.Sprintf("  Handshake Header\n")
 	out += fmt.Sprintf("    message type....: %02x\n", serverHello.handshakeHeader.message_type)
 	out += fmt.Sprintf("    footer..........: %x\n", serverHello.handshakeHeader.footer)
-	out += fmt.Sprintf("    footerInt.......: %x\n", serverHello.handshakeHeader.footerInt)
+	out += fmt.Sprintf("    footerInt.......: %d\n", serverHello.handshakeHeader.footerInt)
 	out += fmt.Sprintf("  Server Version....: %x\n", serverHello.serverVersion)
 	out += fmt.Sprintf("  Server Random.....: %x\n", serverHello.serverRandom)
+	out += fmt.Sprintf("  Session ID length.: %x\n", serverHello.sessionIDLenght)
+	out += fmt.Sprintf("  Session ID lengthI: %d\n", serverHello.sessionIDLenghtInt)
 	out += fmt.Sprintf("  Session ID........: %x\n", serverHello.sessionID)
 	out += fmt.Sprintf("  CipherSuite.......: %x\n", serverHello.cipherSuite)
 	out += fmt.Sprintf("  CompressionMethod.: %x\n", serverHello.compressionMethod)
@@ -159,6 +175,22 @@ func (serverHello ServerHello) String() string {
 	return out
 }
 
+type ServerCertificate struct {
+	recordHeader     RecordHeader
+	handshakeHeader  HandshakeHeader
+	certificatLenght [3]byte
+	/// apparently there can be more than one cert, this must be accounted for..
+	certificatLenghtN [3]byte // this must be a array of arrays?
+	certificate       []byte
+	// certificateN [][]byte
+}
+
+func parseServerCertificate(answer []byte) (ServerCertificate, []byte) {
+	serverCertificate := ServerCertificate{}
+
+	return serverCertificate, answer
+}
+
 func main() {
 
 	srvAddr := "heise.de:443"
@@ -170,9 +202,11 @@ func main() {
 	var answer []byte
 	answer = readFromServer(conn)
 
-	serverHello := parseHelloServer(answer)
-
+	serverHello, answer := parseHelloServer(answer)
 	fmt.Println(serverHello)
+
+	serverCertificate, answer := parseServerCertificate(answer)
+	fmt.Println(serverCertificate)
 
 	conn.Close()
 }
