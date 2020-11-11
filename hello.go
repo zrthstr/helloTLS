@@ -56,34 +56,48 @@ func connectToServer(srvAddr string) net.TCPConn {
 	return *conn
 }
 
-func parseHelloServer(answer []byte) (ServerHello, []byte) {
-	println("Parsing Server Hello")
-	//var offset uint64
-	offset := 0
-	serverHello := ServerHello{}
-	//println("Parsing Server Hello > Record Header")
+//func parseRecordHeader(answer [5]byte) RecordHeader {
+func parseRecordHeader(answer []byte) RecordHeader {
 	recordHeader := RecordHeader{}
 	recordHeader.ttype = answer[0]
 	copy(recordHeader.protocol_verion[:], answer[1:3])
 	copy(recordHeader.footer[:], answer[3:5])
-	//println(recordHeader.footer[0], recordHeader.footer[1])
 	recordHeader.footerInt = binary.BigEndian.Uint16(answer[3:5])
-	serverHello.recordHeader = recordHeader
+	return recordHeader
+}
 
-	offset += 5
+func parseHandshakeHeader(answer []byte) HandshakeHeader {
 	handshakeHeader := HandshakeHeader{}
-	handshakeHeader.message_type = answer[offset+0]
-	copy(handshakeHeader.footer[:], answer[offset+1:offset+4])
-	handshakeHeader.footerInt = binary.BigEndian.Uint32(append([]byte{0}, answer[offset+1:offset+4]...))
-	serverHello.handshakeHeader = handshakeHeader
+	handshakeHeader.message_type = answer[0]
+	copy(handshakeHeader.footer[:], answer[1:4])
+	handshakeHeader.footerInt = binary.BigEndian.Uint32(append([]byte{0}, answer[1:4]...))
 
+	return handshakeHeader
+}
+
+func parseExtensionRenegotiationInfo(answer []byte) ExtensionRenegotiationInfo {
+	extensionRenegotiationInfo := ExtensionRenegotiationInfo{}
+	copy(extensionRenegotiationInfo.info[:], answer[:2])
+	copy(extensionRenegotiationInfo.length[:], answer[2:4])
+	copy(extensionRenegotiationInfo.payload[:], answer[4:5])
+	return extensionRenegotiationInfo
+}
+
+func parseHelloServer(answer []byte) (ServerHello, []byte) {
+	println("Parsing Server Hello")
+	offset := 0
+	serverHello := ServerHello{}
+
+	serverHello.recordHeader = parseRecordHeader(answer[0:5])
+	offset += 5
+
+	serverHello.handshakeHeader = parseHandshakeHeader(answer[offset : offset+4])
 	offset += 4
+
 	copy(serverHello.serverVersion[:], answer[offset:offset+2])
 	copy(serverHello.serverRandom[:], answer[offset+2:offset+34])
 	copy(serverHello.sessionIDLenght[:], answer[offset+34:offset+35])
 
-	// if sessionIDLenght > 0 ...
-	//serverHello.sessionIDLenghtInt = binary.BigEndian.Uint16(serverHello.sessionIDLenght[:])
 	serverHello.sessionIDLenghtInt = int(serverHello.sessionIDLenght[0])
 	if serverHello.sessionIDLenghtInt > 0 {
 		serverHello.sessionID = answer[offset+35 : offset+serverHello.sessionIDLenghtInt+35]
@@ -94,14 +108,18 @@ func parseHelloServer(answer []byte) (ServerHello, []byte) {
 	copy(serverHello.cipherSuite[:], answer[offset+35:offset+37])
 	copy(serverHello.compressionMethod[:], answer[offset+37:offset+38])
 	copy(serverHello.extensionLength[:], answer[offset+38:offset+40])
-	recordHeader.footerInt = binary.BigEndian.Uint16(answer[3:5])
-
-	extensionRenegotiationInfo := ExtensionRenegotiationInfo{}
+	//recordHeader.footerInt = binary.BigEndian.Uint16(answer[3:5]) // what is this?
 	offset += 40
-	copy(extensionRenegotiationInfo.info[:], answer[offset:offset+2])
-	copy(extensionRenegotiationInfo.length[:], answer[offset+2:offset+4])
-	copy(extensionRenegotiationInfo.payload[:], answer[offset+4:offset+5])
-	serverHello.extensionRenegotiationInfo = extensionRenegotiationInfo
+
+	/*
+		extensionRenegotiationInfo := ExtensionRenegotiationInfo{}
+		copy(extensionRenegotiationInfo.info[:], answer[offset:offset+2])
+		copy(extensionRenegotiationInfo.length[:], answer[offset+2:offset+4])
+		copy(extensionRenegotiationInfo.payload[:], answer[offset+4:offset+5])
+		serverHello.extensionRenegotiationInfo = extensionRenegotiationInfo
+	*/
+	serverHello.extensionRenegotiationInfo = parseExtensionRenegotiationInfo(answer[offset:])
+	offset += 5
 
 	//copy(serverHello.extensionRenegotiationInfo[:], answer[offset+40:offset+45])
 
