@@ -111,17 +111,8 @@ func parseHelloServer(answer []byte) (ServerHello, []byte) {
 	//recordHeader.footerInt = binary.BigEndian.Uint16(answer[3:5]) // what is this?
 	offset += 40
 
-	/*
-		extensionRenegotiationInfo := ExtensionRenegotiationInfo{}
-		copy(extensionRenegotiationInfo.info[:], answer[offset:offset+2])
-		copy(extensionRenegotiationInfo.length[:], answer[offset+2:offset+4])
-		copy(extensionRenegotiationInfo.payload[:], answer[offset+4:offset+5])
-		serverHello.extensionRenegotiationInfo = extensionRenegotiationInfo
-	*/
 	serverHello.extensionRenegotiationInfo = parseExtensionRenegotiationInfo(answer[offset:])
 	offset += 5
-
-	//copy(serverHello.extensionRenegotiationInfo[:], answer[offset+40:offset+45])
 
 	return serverHello, answer[offset:]
 }
@@ -163,19 +154,35 @@ type ServerHello struct {
 //func (HandshakeHeader HandshakeHeader) String() string {}
 //func (extensionRenegotiationInfo ExtensionRenegotiationInfo) String() string {}
 
+func (recordHeader RecordHeader) String() string {
+	out := fmt.Sprintf("  Record Header\n")
+	out += fmt.Sprintf("    ttype...........: %x\n", recordHeader.ttype)
+	out += fmt.Sprintf("    protocol Version: %x\n", recordHeader.protocol_verion)
+	out += fmt.Sprintf("    footer..........: %x\n", recordHeader.footer)
+	out += fmt.Sprintf("    footerInt.......: %x\n", recordHeader.footerInt)
+	return out
+}
+
+func (handshakeHeader HandshakeHeader) String() string {
+	out := fmt.Sprintf("  Handshake Header\n")
+	out += fmt.Sprintf("    message type....: %02x\n", handshakeHeader.message_type)
+	out += fmt.Sprintf("    footer..........: %x\n", handshakeHeader.footer)
+	out += fmt.Sprintf("    footerInt.......: %d\n", handshakeHeader.footerInt)
+	return out
+}
+
+func (extensionRenegotiationInfo ExtensionRenegotiationInfo) String() string {
+	out := fmt.Sprintf("  Extension Renegotiation Info\n")
+	out += fmt.Sprintf("    info:...........: %x\n", extensionRenegotiationInfo.info)
+	out += fmt.Sprintf("    length:.........: %x\n", extensionRenegotiationInfo.length)
+	out += fmt.Sprintf("    payload:........: %x\n", extensionRenegotiationInfo.payload)
+	return out
+}
+
 func (serverHello ServerHello) String() string {
 	out := fmt.Sprintf("Server Hello\n")
-	//out += fmt.Sprintf(serverHello.recordHeader)
-	//out += fmt.Sprintf(serverHello.handshakeHeader)
-	out += fmt.Sprintf("  Record Header\n")
-	out += fmt.Sprintf("    ttype...........: %x\n", serverHello.recordHeader.ttype)
-	out += fmt.Sprintf("    protocol Version: %x\n", serverHello.recordHeader.protocol_verion)
-	out += fmt.Sprintf("    footer..........: %x\n", serverHello.recordHeader.footer)
-	out += fmt.Sprintf("    footerInt.......: %x\n", serverHello.recordHeader.footerInt)
-	out += fmt.Sprintf("  Handshake Header\n")
-	out += fmt.Sprintf("    message type....: %02x\n", serverHello.handshakeHeader.message_type)
-	out += fmt.Sprintf("    footer..........: %x\n", serverHello.handshakeHeader.footer)
-	out += fmt.Sprintf("    footerInt.......: %d\n", serverHello.handshakeHeader.footerInt)
+	out += fmt.Sprint(serverHello.recordHeader)
+	out += fmt.Sprint(serverHello.handshakeHeader)
 	out += fmt.Sprintf("  Server Version....: %x\n", serverHello.serverVersion)
 	out += fmt.Sprintf("  Server Random.....: %x\n", serverHello.serverRandom)
 	out += fmt.Sprintf("  Session ID length.: %x\n", serverHello.sessionIDLenght)
@@ -184,12 +191,8 @@ func (serverHello ServerHello) String() string {
 	out += fmt.Sprintf("  CipherSuite.......: %x\n", serverHello.cipherSuite)
 	out += fmt.Sprintf("  CompressionMethod.: %x\n", serverHello.compressionMethod)
 	out += fmt.Sprintf("  ExtensionLength...: %x\n", serverHello.extensionLength)
-	out += fmt.Sprintf("  Extension Renegotiation Info\n")
-	out += fmt.Sprintf("    info:...........: %x\n", serverHello.extensionRenegotiationInfo.info)
-	out += fmt.Sprintf("    length:.........: %x\n", serverHello.extensionRenegotiationInfo.length)
-	out += fmt.Sprintf("    payload:........: %x\n", serverHello.extensionRenegotiationInfo.payload)
-
-	//out += fmt.Sprintf(serverHello.extensionRenegotiationInfo)
+	//out += fmt.Sprintf("s%", serverHello.extensionRenegotiationInfo)
+	out += fmt.Sprint(serverHello.extensionRenegotiationInfo)
 	return out
 }
 
@@ -201,6 +204,11 @@ type ServerCertificate struct {
 	certificatLenghtN [3]byte // this must be a array of arrays?
 	certificate       []byte
 	// certificateN [][]byte
+}
+
+func (serverCertificate ServerCertificate) String() string {
+	out := fmt.Sprintf("Server Certificate\n")
+	return out
 }
 
 func parseServerCertificate(answer []byte) (ServerCertificate, []byte) {
