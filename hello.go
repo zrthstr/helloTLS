@@ -156,26 +156,26 @@ type ServerHello struct {
 
 func (recordHeader RecordHeader) String() string {
 	out := fmt.Sprintf("  Record Header\n")
-	out += fmt.Sprintf("    ttype...........: %x\n", recordHeader.ttype)
-	out += fmt.Sprintf("    protocol Version: %x\n", recordHeader.protocol_verion)
-	out += fmt.Sprintf("    footer..........: %x\n", recordHeader.footer)
-	out += fmt.Sprintf("    footerInt.......: %x\n", recordHeader.footerInt)
+	out += fmt.Sprintf("    ttype............:     %02x\n", recordHeader.ttype)
+	out += fmt.Sprintf("    protocol Version.: %6x\n", recordHeader.protocol_verion)
+	out += fmt.Sprintf("    footer...........: %6x\n", recordHeader.footer)
+	out += fmt.Sprintf("    footerInt........: %6x\n", recordHeader.footerInt)
 	return out
 }
 
 func (handshakeHeader HandshakeHeader) String() string {
 	out := fmt.Sprintf("  Handshake Header\n")
-	out += fmt.Sprintf("    message type....: %02x\n", handshakeHeader.message_type)
-	out += fmt.Sprintf("    footer..........: %x\n", handshakeHeader.footer)
-	out += fmt.Sprintf("    footerInt.......: %d\n", handshakeHeader.footerInt)
+	out += fmt.Sprintf("    message type.....:     %02x\n", handshakeHeader.message_type)
+	out += fmt.Sprintf("    footer...........: %6x\n", handshakeHeader.footer)
+	out += fmt.Sprintf("    footerInt........: %6d\n", handshakeHeader.footerInt)
 	return out
 }
 
 func (extensionRenegotiationInfo ExtensionRenegotiationInfo) String() string {
 	out := fmt.Sprintf("  Extension Renegotiation Info\n")
-	out += fmt.Sprintf("    info:...........: %x\n", extensionRenegotiationInfo.info)
-	out += fmt.Sprintf("    length:.........: %x\n", extensionRenegotiationInfo.length)
-	out += fmt.Sprintf("    payload:........: %x\n", extensionRenegotiationInfo.payload)
+	out += fmt.Sprintf("    info:............: %6x\n", extensionRenegotiationInfo.info)
+	out += fmt.Sprintf("    length:..........: %6x\n", extensionRenegotiationInfo.length)
+	out += fmt.Sprintf("    payload:.........: %6x\n", extensionRenegotiationInfo.payload)
 	return out
 }
 
@@ -183,23 +183,24 @@ func (serverHello ServerHello) String() string {
 	out := fmt.Sprintf("Server Hello\n")
 	out += fmt.Sprint(serverHello.recordHeader)
 	out += fmt.Sprint(serverHello.handshakeHeader)
-	out += fmt.Sprintf("  Server Version....: %x\n", serverHello.serverVersion)
-	out += fmt.Sprintf("  Server Random.....: %x\n", serverHello.serverRandom)
-	out += fmt.Sprintf("  Session ID length.: %x\n", serverHello.sessionIDLenght)
-	out += fmt.Sprintf("  Session ID lengthI: %d\n", serverHello.sessionIDLenghtInt)
-	out += fmt.Sprintf("  Session ID........: %x\n", serverHello.sessionID)
-	out += fmt.Sprintf("  CipherSuite.......: %x\n", serverHello.cipherSuite)
-	out += fmt.Sprintf("  CompressionMethod.: %x\n", serverHello.compressionMethod)
-	out += fmt.Sprintf("  ExtensionLength...: %x\n", serverHello.extensionLength)
+	out += fmt.Sprintf("  Server Version.....: %6x\n", serverHello.serverVersion)
+	out += fmt.Sprintf("  Server Random......: %6x\n", serverHello.serverRandom)
+	out += fmt.Sprintf("  Session ID length..: %6x\n", serverHello.sessionIDLenght)
+	out += fmt.Sprintf("  Session ID lengthI.: %6d\n", serverHello.sessionIDLenghtInt)
+	out += fmt.Sprintf("  Session ID.........: %6x\n", serverHello.sessionID)
+	out += fmt.Sprintf("  CipherSuite........: %6x\n", serverHello.cipherSuite)
+	out += fmt.Sprintf("  CompressionMethod..: %6x\n", serverHello.compressionMethod)
+	out += fmt.Sprintf("  ExtensionLength....: %6x\n", serverHello.extensionLength)
 	//out += fmt.Sprintf("s%", serverHello.extensionRenegotiationInfo)
 	out += fmt.Sprint(serverHello.extensionRenegotiationInfo)
 	return out
 }
 
 type ServerCertificate struct {
-	recordHeader     RecordHeader
-	handshakeHeader  HandshakeHeader
-	certificatLenght [3]byte
+	recordHeader        RecordHeader
+	handshakeHeader     HandshakeHeader
+	certificatLenght    [3]byte
+	certificatLenghtInt uint32
 	/// apparently there can be more than one cert, this must be accounted for..
 	certificatLenghtN [3]byte // this must be a array of arrays?
 	certificate       []byte
@@ -208,11 +209,29 @@ type ServerCertificate struct {
 
 func (serverCertificate ServerCertificate) String() string {
 	out := fmt.Sprintf("Server Certificate\n")
+	out += fmt.Sprint(serverCertificate.recordHeader)
+	out += fmt.Sprint(serverCertificate.handshakeHeader)
+	out += fmt.Sprintf("  Certificate Lenght.: %x\n", serverCertificate.certificatLenght)
+	out += fmt.Sprintf("  Certificate LenghtN: %x\n", serverCertificate.certificatLenghtN)
+	out += fmt.Sprintf("  Certificate........: %x\n", serverCertificate.certificate)
 	return out
 }
 
 func parseServerCertificate(answer []byte) (ServerCertificate, []byte) {
+	var offset uint32
+	offset = 0
 	serverCertificate := ServerCertificate{}
+	serverCertificate.recordHeader = parseRecordHeader(answer[:5])
+	offset += 5
+	serverCertificate.handshakeHeader = parseHandshakeHeader(answer[offset : offset+5])
+	offset += 4
+	//serverCertificate.certificatLenght = binary.BigEndian.Uint32(append([]byte{0}, answer[5:8]...))
+	copy(serverCertificate.certificatLenght[:], answer[5:8])
+	//handshakeHeader.footerInt = binary.BigEndian.Uint32(append([]byte{0}, answer[1:4]...))
+	copy(serverCertificate.certificatLenghtN[:], answer[8:11])
+	serverCertificate.certificatLenghtInt = binary.BigEndian.Uint32(append([]byte{0}, serverCertificate.certificatLenght[0:3]...))
+	println(serverCertificate.certificatLenghtInt)
+	//copy(serverCertificate.certificate, answer[offset+11:offset+11+serverCertificate.certificatLenghtInt])
 
 	return serverCertificate, answer
 }
