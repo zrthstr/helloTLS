@@ -9,6 +9,7 @@ import (
 )
 
 // https://tls.ulfheim.net/
+// https://tools.ietf.org/html/rfc5246#section-7.4.1.4
 
 func sendToServer(conn net.TCPConn, msgHex string) {
 
@@ -150,10 +151,6 @@ type ServerHello struct {
 	extensionRenegotiationInfo ExtensionRenegotiationInfo
 }
 
-//func (recordHeader RecordHeader) String() string {}
-//func (HandshakeHeader HandshakeHeader) String() string {}
-//func (extensionRenegotiationInfo ExtensionRenegotiationInfo) String() string {}
-
 func (recordHeader RecordHeader) String() string {
 	out := fmt.Sprintf("  Record Header\n")
 	out += fmt.Sprintf("    ttype............:     %02x\n", recordHeader.ttype)
@@ -222,18 +219,21 @@ func parseServerCertificate(answer []byte) (ServerCertificate, []byte) {
 	offset = 0
 	serverCertificate := ServerCertificate{}
 	serverCertificate.recordHeader = parseRecordHeader(answer[:5])
+	fmt.Println(answer[:5])
+
 	offset += 5
-	serverCertificate.handshakeHeader = parseHandshakeHeader(answer[offset : offset+5])
+	serverCertificate.handshakeHeader = parseHandshakeHeader(answer[offset : offset+4])
 	offset += 4
 	//serverCertificate.certificatLenght = binary.BigEndian.Uint32(append([]byte{0}, answer[5:8]...))
-	copy(serverCertificate.certificatLenght[:], answer[5:8])
+	copy(serverCertificate.certificatLenght[:], answer[offset:offset+3])
 	//handshakeHeader.footerInt = binary.BigEndian.Uint32(append([]byte{0}, answer[1:4]...))
-	copy(serverCertificate.certificatLenghtN[:], answer[8:11])
+	offset += 3
+	copy(serverCertificate.certificatLenghtN[:], answer[offset:offset+3])
 	serverCertificate.certificatLenghtInt = binary.BigEndian.Uint32(append([]byte{0}, serverCertificate.certificatLenght[0:3]...))
 	println(serverCertificate.certificatLenghtInt)
 	//copy(serverCertificate.certificate, answer[offset+11:offset+11+serverCertificate.certificatLenghtInt])
 
-	return serverCertificate, answer
+	return serverCertificate, answer[offset:]
 }
 
 func main() {
